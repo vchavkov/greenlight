@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+
+. _config.sh;
+
+ENV_FILE=".env";
+
+cp -f "${ENV_FILE}.tpl" "${ENV_FILE}";
+
+# remove instance
+flynn apps | grep $IMAGE_NAME;
+if [ $? -eq 0 ]; then
+    flynn -a $IMAGE_NAME delete -y
+fi
+
+# create instance
+flynn create --remote "" $IMAGE_NAME
+
+# database
+flynn -a $IMAGE_NAME resource add postgres
+
+# set public_url
+flynn -a $IMAGE_NAME env set PUBLIC_URL="https://${IMAGE_NAME}.f.assistance.bg"
+
+# flynn env
+for line in `flynn -a $IMAGE_NAME env`; do
+
+    KEY=$(echo ${line} | cut -d= -f1)
+    VALUE=$(printf "%s" ${line} | cut -d= -f2 | tr -d "\r\n")
+
+    # debug
+    # echo $line;
+    # printf "${KEY}:${VALUE}\n";
+
+    case "$KEY" in
+        # exclude a few keys
+        "PUBLIC_URL"|"PGHOST"|"FLYNN_POSTGRES")
+        ;;
+        *)
+            ${SED_CMD} -i "s|%${KEY}%|${VALUE}|g" ${ENV_FILE};
+        ;;
+    esac
+done;
+
+# manual fixes
+${SED_CMD} -i "s|%PUBLIC_URL%|http://localhost:8080|g" ${ENV_FILE};
+${SED_CMD} -i "s|%PUBLIC_PORT%|8080|g" ${ENV_FILE};
+
+${SED_CMD} -i "s|%PGHOST%|leader.f.assistance.bg|g" ${ENV_FILE};
+${SED_CMD} -i "s|leader.postgres.discoverd|leader.f.assistance.bg|g" ${ENV_FILE};
+
+${SED_CMD} -i "s|%PGPORT%|3001|g" ${ENV_FILE};
+${SED_CMD} -i "s|5432|3001|g" ${ENV_FILE};

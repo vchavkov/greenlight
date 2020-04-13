@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+
+WWW_ROOT="`pwd`"
+
+ENV_FILE="${WWW_ROOT}/.env"
+CONFIG_JSON="config.json"
+
+cp -f "${CONFIG_JSON}.tpl" "${CONFIG_JSON}";
+
+# printf "\nPATH: ${WWW_ROOT}\n\n";
+
+# detect OS
+unameOut="$(uname -s)"
+case "${unameOut}" in
+    Linux*)     SED_CMD=sed;;
+    Darwin*)    SED_CMD=gsed;;
+    CYGWIN*)    SED_CMD=sed;;
+    MINGW*)     SED_CMD=sed;;
+    *)          SED_CMD=sed;;
+esac
+
+${SED_CMD} -e "s#%WWW_ROOT%#${WWW_ROOT}#g" -i "${CONFIG_JSON}";
+
+old_IFS=$IFS;
+IFS='
+';
+filelines=`cat $ENV_FILE`
+for line in $filelines ; do
+    KEY=$(echo ${line} | cut -d= -f1)
+    VALUE=$(printf "%s" ${line} | cut -d= -f2 | tr -d "\r\n")
+    # IFS="=" read ${KEY} VALUE <<< "${line}"
+    ${SED_CMD} -i "s|%${KEY}%|${VALUE}|g" ${CONFIG_JSON};
+done;
+IFS=${old_IFS};
+
+printf "${CONFIG_JSON}\n\n"
+cat "${CONFIG_JSON}";
